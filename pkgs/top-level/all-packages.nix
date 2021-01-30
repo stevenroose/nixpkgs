@@ -24114,6 +24114,10 @@ in
 
   peek = callPackage ../applications/video/peek { };
 
+  peertube = callPackage ../servers/peertube {
+    nodejs = pkgs.nodejs-12_x;
+  };
+
   pflask = callPackage ../os-specific/linux/pflask {};
 
   pfsshell = callPackage ../tools/misc/pfsshell { };
