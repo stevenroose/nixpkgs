@@ -13,16 +13,18 @@ rec {
     inherit version;
     src = sources;
     buildPhase = ''
-          ln -s ${server.modules}/node_modules .
-          cp -a ${modules}/node_modules client/
-          chmod -R +w client/node_modules
-          patchShebangs .
-          npm run build:client
+      ln -s ${server.modules}/node_modules .
+      cp -a ${modules}/node_modules client/
+      chmod -R +w client/node_modules
+      patchShebangs .
+      npm run build:client
     '';
+
     installPhase = ''
-          mkdir $out
-          cp -a client/dist $out
+      mkdir $out
+      cp -a client/dist $out
     '';
+
     buildInputs = [ nodejs ];
   };
 }

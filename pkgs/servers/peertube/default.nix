@@ -21,31 +21,33 @@ let
     installPhase = ''
       mkdir $out
       cp -a . $out/
-      '';
+    '';
   };
   yarnModulesConfig = {
     bcrypt = {
       buildInputs = [ nodePackages.node-pre-gyp ];
+
       postInstall = let
         bcrypt_version = "5.0.0";
         bcrypt_lib = fetchurl {
           url = "https://github.com/kelektiv/node.bcrypt.js/releases/download/v${bcrypt_version}/bcrypt_lib-v${bcrypt_version}-napi-v3-linux-x64-glibc.tar.gz";
           sha256 = "0j3p2px1xb17sw3gpm8l4apljajxxfflal1yy552mhpzhi21wccn";
         };
-      in
-        ''
-          if [ "${bcrypt_version}" != "$(cat package.json | ${jq}/bin/jq -r .version)" ]; then
-            echo "Mismatching version please update bcrypt in derivation"
-            false
-          fi
-          mkdir -p lib/binding && tar -C lib/binding -xf ${bcrypt_lib}
-          patchShebangs ../node-pre-gyp
-          npm run install
-        '';
+      in ''
+        if [ "${bcrypt_version}" != "$(cat package.json | ${jq}/bin/jq -r .version)" ]; then
+          echo "Mismatching version please update bcrypt in derivation"
+          false
+        fi
+        mkdir -p lib/binding && tar -C lib/binding -xf ${bcrypt_lib}
+        patchShebangs ../node-pre-gyp
+        npm run install
+      '';
     };
+
     utf-8-validate = {
       buildInputs = [ nodePackages.node-gyp-build ];
     };
+
     youtube-dl = {
       postInstall = ''
         mkdir bin
@@ -53,9 +55,10 @@ let
         cat > bin/details <<EOF
         {"version":"${youtube-dl.version}","path":null,"exec":"youtube-dl"}
         EOF
-        '';
+      '';
     };
   };
+
   mkYarnModules' = args: (yarn2nix-moretea.mkYarnModules args).overrideAttrs(old: {
     # This hack permits to workaround the fact that the yarn.lock
     # file doesn't respect the semver requirements
@@ -66,6 +69,7 @@ let
     inherit version yarnModulesConfig mkYarnModules';
     sources = patchedSource;
   };
+
   client = callPackage ./client.nix {
     inherit server version yarnModulesConfig mkYarnModules';
     sources = patchedSource;
@@ -75,16 +79,18 @@ in stdenv.mkDerivation rec {
   inherit version;
   pname = "peertube";
   src = patchedSource;
+
   buildPhase = ''
     ln -s ${server.modules}/node_modules .
     rm -rf dist && cp -a ${server.dist}/dist dist
     rm -rf client/dist && cp -a ${client.dist}/dist client/
-    '';
+  '';
+
   installPhase = ''
     mkdir $out
     cp -a * $out
     ln -s /tmp $out/.cache
-    '';
+  '';
 
   meta = {
     description = "A free software to take back control of your videos";
@@ -107,7 +113,6 @@ in stdenv.mkDerivation rec {
     license = stdenv.lib.licenses.agpl3Plus;
 
     homepage = "https://joinpeertube.org/";
-
     platforms = stdenv.lib.platforms.unix;
 
     maintainers = with stdenv.lib.maintainers; [ immae stevenroose ];

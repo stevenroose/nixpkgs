@@ -17,10 +17,12 @@ rec {
       patchShebangs scripts/build/server.sh
       npm run build:server
     '';
+
     installPhase = ''
       mkdir $out
       cp -a dist $out
     '';
+
     buildInputs = [ nodejs ];
   };
 }
