@@ -26,6 +26,7 @@ let
   yarnModulesConfig = {
     bcrypt = {
       buildInputs = [ nodePackages.node-pre-gyp ];
+
       postInstall = let
         bcrypt_version = "5.0.0";
         bcrypt_lib = fetchurl {
@@ -42,9 +43,11 @@ let
         npm run install
       '';
     };
+
     utf-8-validate = {
       buildInputs = [ nodePackages.node-gyp-build ];
     };
+
     youtube-dl = {
       postInstall = ''
         mkdir bin
@@ -55,6 +58,7 @@ let
       '';
     };
   };
+
   mkYarnModules' = args: (yarn2nix-moretea.mkYarnModules args).overrideAttrs(old: {
     # This hack permits to workaround the fact that the yarn.lock
     # file doesn't respect the semver requirements
@@ -65,6 +69,7 @@ let
     inherit version yarnModulesConfig mkYarnModules';
     sources = patchedSource;
   };
+
   client = callPackage ./client.nix {
     inherit server version yarnModulesConfig mkYarnModules';
     sources = patchedSource;
@@ -74,11 +79,13 @@ in stdenv.mkDerivation rec {
   inherit version;
   pname = "peertube";
   src = patchedSource;
+
   buildPhase = ''
     ln -s ${server.modules}/node_modules .
     rm -rf dist && cp -a ${server.dist}/dist dist
     rm -rf client/dist && cp -a ${client.dist}/dist client/
   '';
+
   installPhase = ''
     mkdir $out
     cp -a * $out
@@ -106,7 +113,6 @@ in stdenv.mkDerivation rec {
     license = stdenv.lib.licenses.agpl3Plus;
 
     homepage = "https://joinpeertube.org/";
-
     platforms = stdenv.lib.platforms.unix;
 
     maintainers = with stdenv.lib.maintainers; [ immae stevenroose ];

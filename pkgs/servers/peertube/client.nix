@@ -19,10 +19,12 @@ rec {
       patchShebangs .
       npm run build:client
     '';
+
     installPhase = ''
       mkdir $out
       cp -a client/dist $out
     '';
+
     buildInputs = [ nodejs ];
   };
 }
