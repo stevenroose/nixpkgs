@@ -101,6 +101,8 @@ in
 
     services.postgresql = lib.mkIf cfg.database.createLocally {
       enable = true;
+      ensureUsers = [ { name = cfg.database.user; }];
+      # The database is created as a startup script of the peertube service.
       authentication = ''
         host ${cfg.database.name} ${cfg.database.user} 127.0.0.1/32 trust
         host ${cfg.database.name} ${cfg.database.user} 127.0.0.1/32 md5
