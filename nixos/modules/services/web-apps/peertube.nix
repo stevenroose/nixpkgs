@@ -131,6 +131,7 @@ in
       environment.NODE_CONFIG_DIR = "${cfg.runtimeDir}/config";
       environment.NODE_ENV = "production";
       environment.HOME = cfg.package;
+      environment.NODE_EXTRA_CA_CERTS = "/etc/ssl/certs/ca-certificates.crt";
 
       path = [ pkgs.nodejs pkgs.bashInteractive pkgs.ffmpeg pkgs.openssl pkgs.sudo pkgs.youtube-dl ];
 
