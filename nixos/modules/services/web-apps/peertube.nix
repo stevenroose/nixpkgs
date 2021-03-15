@@ -32,7 +32,13 @@ in
 
     database = {
       createLocally = lib.mkOption {
-        description = "Configure local PostgreSQL database server for PeerTube.";
+        description = "Configure local PostgreSQL database server for PeerTube.
+          <warning>
+            <para>
+              You need to set <literal>database.hostname</literal> to <literal>/run/postgresql</literal> in the peertube configuration file.
+            </para>
+          </warning>
+        ";
         type = lib.types.bool;
         default = true;
       };
