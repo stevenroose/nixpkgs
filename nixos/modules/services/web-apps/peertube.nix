@@ -89,8 +89,6 @@ in
         description = "Peertube user";
         home = cfg.runtimeDir;
         useDefaultShell = true;
-        # todo: fix this. needed for postgres authentication
-        password = "peertube";
       };
     };
     users.groups = lib.optionalAttrs (cfg.group == name) {
@@ -103,10 +101,6 @@ in
       enable = true;
       ensureUsers = [ { name = cfg.database.user; }];
       # The database is created as a startup script of the peertube service.
-      authentication = ''
-        host ${cfg.database.name} ${cfg.database.user} 127.0.0.1/32 trust
-        host ${cfg.database.name} ${cfg.database.user} 127.0.0.1/32 md5
-      '';
     };
 
     services.postfix = lib.mkIf cfg.smtp.createLocally {
