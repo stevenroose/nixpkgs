@@ -171,7 +171,7 @@ in
             rm "${cfg.runtimeDir}/.first_run_partial"
           fi
         '';
-        in "+${script}";
+        in lib.mkIf cfg.database.createLocally "+${script}";
       };
 
       unitConfig.RequiresMountsFor = cfg.runtimeDir;
