@@ -2,6 +2,52 @@
 
 let
   cfg = config.services.peertube;
+
+  settingsFormat = pkgs.formats.yaml {};
+  configFile = pkgs.writeText "production.yaml" ''
+    listen:
+      hostname: 'localhost'
+      port: 9000
+
+    webserver:
+      https: true
+      hostname: '${cfg.hostname}'
+      port: 443
+
+    database:
+      hostname: '/run/postgresql'
+      port: 5432
+      ssl: false
+      suffix: '_prod'
+      username: 'peertube'
+      password: 'peertube'
+      pool:
+        max: 5
+
+    redis:
+      hostname: 'localhost'
+      port: 6379
+      auth: null
+      db: 0
+
+    storage:
+      tmp: '/var/lib/peertube/storage/tmp/'
+      avatars: '/var/lib/peertube/storage/avatars/'
+      videos: '/var/lib/peertube/storage/videos/'
+      streaming_playlists: '/var/lib/peertube/storage/streaming-playlists/'
+      redundancy: '/var/lib/peertube/storage/redundancy/'
+      logs: '/var/lib/peertube/storage/logs/'
+      previews: '/var/lib/peertube/storage/previews/'
+      thumbnails: '/var/lib/peertube/storage/thumbnails/'
+      torrents: '/var/lib/peertube/storage/torrents/'
+      captions: '/var/lib/peertube/storage/captions/'
+      cache: '/var/lib/peertube/storage/cache/'
+      plugins: '/var/lib/peertube/storage/plugins/'
+      client_overrides: '/var/lib/peertube/storage/client-overrides/'
+
+    ${cfg.extraConfig}
+  '';
+
 in
 {
   options.services.peertube = {
@@ -13,11 +59,14 @@ in
       description = "System service and database user.";
     };
 
-    configFile = lib.mkOption {
-      type = lib.types.path;
-      description = ''
-        The configuration file path for Peertube.
-      '';
+    hostname = lib.mkOption {
+      type = lib.types.str;
+      default = "example.com";
+    };
+
+    extraConfig = lib.mkOption {
+      type = lib.types.lines;
+      default = "";
     };
 
     database = {
@@ -95,7 +144,8 @@ in
 
       script = ''
         install -m 0750 -d /var/lib/peertube/config
-        ln -sf ${cfg.configFile} /var/lib/peertube/config/production.yaml
+        ln -sf ${cfg.package}/config/default.yaml /var/lib/peertube/config/default.yaml
+        ln -sf ${configFile} /var/lib/peertube/config/production.yaml
         exec npm start
       '';
 
