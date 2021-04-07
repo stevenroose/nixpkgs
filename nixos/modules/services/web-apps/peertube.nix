@@ -143,11 +143,6 @@ in
   config = lib.mkIf cfg.enable {
     services.postgresql = lib.mkIf cfg.database.createLocally {
       enable = true;
-      ensureUsers = [ {
-        name = cfg.user;
-        ensurePermissions = { "DATABASE ${cfg.database.name}" = "ALL PRIVILEGES"; };
-      }];
-      # The database is created in the startup script of the peertube service.
     };
 
     services.postfix = lib.mkIf cfg.smtp.createLocally {
@@ -195,8 +190,8 @@ in
           ln -sf ${configFile} /var/lib/peertube/config/production.yaml
           exec npm start
         '';
-        in "+${script}";
-      } // (lib.optionalAttrs (!cfg.database.createLocally) { # TODO FIXME if else
+        in "${script}";
+      } // (lib.optionalAttrs (!cfg.database.createLocally) {
         ExecStartPre = let preStartScript = pkgs.writeScript "peertube-pre-start.sh" ''
           #!/bin/sh
           set -e
@@ -206,30 +201,22 @@ in
             password: '$(cat ${cfg.database.passwordFile})'
           EOF
         '';
-        in "+${preStartScript}";
+        in "${preStartScript}";
       }) // (lib.optionalAttrs cfg.database.createLocally {
-        ExecStartPre = let preStartScript = pkgs.writeScript "peertube-pre-start.sh" ''
-          #!/bin/sh
-          set -e
+        ExecStartPre = let
+          psqlSetupCommands = pkgs.writeText "test.sql" ''
+            SELECT 'CREATE USER "${cfg.database.user}"' WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${cfg.database.user}')\gexec
+            SELECT 'CREATE DATABASE "${cfg.database.name}" OWNER "${cfg.database.user}" TEMPLATE template0 ENCODING UTF8' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${cfg.database.name}')\gexec
+            \c '${cfg.database.name}'
+            CREATE EXTENSION IF NOT EXISTS pg_trgm;
+            CREATE EXTENSION IF NOT EXISTS unaccent;
+          '';
+          preStartScript = pkgs.writeScript "peertube-pre-start.sh" ''
+            #!/bin/sh
+            set -e
 
-          if ! [ -e "/var/lib/peertube/.first_run" ]; then
-            set -v
-            if [ -e "/var/lib/peertube/.first_run_partial" ]; then
-              echo "Warn: first run was interrupted"
-            fi
-            touch "/var/lib/peertube/.first_run_partial"
-
-            echo "Running PeerTube's PostgreSQL initialization..."
-            echo "PeerTube is known to work with PostgreSQL v12, if any error occurs, please check your version."
-
-            sudo -u postgres "${config.services.postgresql.package}/bin/createdb" -O ${cfg.user} -E UTF8 -T template0 ${cfg.database.name}
-            sudo -u postgres "${config.services.postgresql.package}/bin/psql" -c "CREATE EXTENSION pg_trgm;" ${cfg.database.name}
-            sudo -u postgres "${config.services.postgresql.package}/bin/psql" -c "CREATE EXTENSION unaccent;" ${cfg.database.name}
-
-            touch "/var/lib/peertube/.first_run"
-            rm "/var/lib/peertube/.first_run_partial"
-          fi
-        '';
+            sudo -u postgres "${config.services.postgresql.package}/bin/psql" -f ${psqlSetupCommands}
+          '';
         in "+${preStartScript}";
       });
     };
