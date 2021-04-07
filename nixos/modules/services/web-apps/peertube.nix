@@ -15,14 +15,11 @@ let
       port: 443
 
     database:
-      hostname: '/run/postgresql'
-      port: 5432
-      ssl: false
-      suffix: '_prod'
-      username: 'peertube'
-      password: 'peertube'
-      pool:
-        max: 5
+      hostname: '${cfg.database.host}'
+      port: '${toString cfg.database.port}'
+      name: '${cfg.database.name}'
+      username: '${cfg.database.user}'
+      ssl: true
 
     redis:
       hostname: 'localhost'
@@ -82,10 +79,39 @@ in
         default = true;
       };
 
+      host = lib.mkOption {
+        type = lib.types.str;
+        default = "/run/postgresql";
+        example = "192.168.15.47";
+        description = "Database host address or unix socket.";
+      };
+
+      port = lib.mkOption {
+        type = lib.types.int;
+        default = 5432;
+        description = "Database host port.";
+      };
+
+      user = lib.mkOption {
+        type = lib.types.str;
+        default = "peertube";
+        description = "Database user.";
+      };
+
       name = lib.mkOption {
         type = lib.types.str;
-        default = "peertube_prod";
+        default = "peertube";
         description = "Database name.";
+      };
+
+      passwordFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        example = "/run/keys/peertube-db-password";
+        description = ''
+          A file containing the password corresponding to
+          <option>database.user</option>.
+        '';
       };
     };
 
@@ -117,7 +143,10 @@ in
   config = lib.mkIf cfg.enable {
     services.postgresql = lib.mkIf cfg.database.createLocally {
       enable = true;
-      ensureUsers = [ { name = cfg.user; }];
+      ensureUsers = [ {
+        name = cfg.user;
+        ensurePermissions = { "DATABASE ${cfg.database.name}" = "ALL PRIVILEGES"; };
+      }];
       # The database is created in the startup script of the peertube service.
     };
 
@@ -132,8 +161,8 @@ in
     systemd.services.peertube = {
       description = "Peertube";
       wantedBy = [ "multi-user.target" ];
-      after = [ "network.target" "postgresql.service" "redis.service" ];
-      wants = [ "postgresql.service" "redis.service" ];
+      after = [ "network.target" "redis.service" ] ++ lib.optionals cfg.database.createLocally [ "postgresql.service" ];
+      wants = [ "redis.service" ] ++ lib.optionals cfg.database.createLocally [ "postgresql.service" ];
 
       environment.NODE_CONFIG_DIR = "/var/lib/peertube/config";
       environment.NODE_ENV = "production";
@@ -141,13 +170,6 @@ in
       environment.NODE_EXTRA_CA_CERTS = "/etc/ssl/certs/ca-certificates.crt";
 
       path = [ pkgs.nodejs pkgs.bashInteractive pkgs.ffmpeg pkgs.openssl pkgs.sudo pkgs.youtube-dl ];
-
-      script = ''
-        install -m 0750 -d /var/lib/peertube/config
-        ln -sf ${cfg.package}/config/default.yaml /var/lib/peertube/config/default.yaml
-        ln -sf ${configFile} /var/lib/peertube/config/production.yaml
-        exec npm start
-      '';
 
       serviceConfig = {
         DynamicUser = true;
@@ -164,7 +186,29 @@ in
         Type = "simple";
         TimeoutSec = 60;
         CapabilityBoundingSet = "~CAP_SYS_ADMIN";
-        ExecStartPre = let script = pkgs.writeScript "peertube-pre-start.sh" ''
+        ExecStart = let script = pkgs.writeScript "peertube-start.sh" ''
+          #!/bin/sh
+          set -e
+
+          install -m 0750 -d /var/lib/peertube/config
+          ln -sf ${cfg.package}/config/default.yaml /var/lib/peertube/config/default.yaml
+          ln -sf ${configFile} /var/lib/peertube/config/production.yaml
+          exec npm start
+        '';
+        in "+${script}";
+      } // (lib.optionalAttrs (!cfg.database.createLocally) { # TODO FIXME if else
+        ExecStartPre = let preStartScript = pkgs.writeScript "peertube-pre-start.sh" ''
+          #!/bin/sh
+          set -e
+
+          cat > ${cfg.runtimeDir}/config/local-production.yaml <<EOF
+          database:
+            password: '$(cat ${cfg.database.passwordFile})'
+          EOF
+        '';
+        in "+${preStartScript}";
+      }) // (lib.optionalAttrs cfg.database.createLocally {
+        ExecStartPre = let preStartScript = pkgs.writeScript "peertube-pre-start.sh" ''
           #!/bin/sh
           set -e
 
@@ -186,8 +230,8 @@ in
             rm "/var/lib/peertube/.first_run_partial"
           fi
         '';
-        in lib.mkIf cfg.database.createLocally "+${script}";
-      };
+        in "+${preStartScript}";
+      });
     };
   };
 }
